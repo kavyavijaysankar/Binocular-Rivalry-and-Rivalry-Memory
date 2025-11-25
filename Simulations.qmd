@@ -1,0 +1,88 @@
+
+```{python}
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.integrate import solve_ivp
+from scipy.optimize import fsolve
+from scipy.integrate import odeint
+import random
+```
+
+Base Parameter values:
+epsilon = 0.0
+M = 1.0
+g = 3.0
+a = 3.4
+L = R for paramater variations
+
+```{python}
+# defining derivatives
+def dELdt(EL, ER, HL, L_input, params):
+    M = params['M']
+    a = params['a']
+    g = params['g']
+    epsilon = params['epsilon']
+    tau = params["tau"]
+    x = L_input - a*ER + epsilon*EL - g*HL
+    return (-EL + M*x) /tau
+
+def dERdt(ER, EL, HR, R_input, params):
+    M = params['M']
+    a = params['a']
+    g = params['g']
+    epsilon = params['epsilon']
+    tau = params["tau"]
+    x = R_input - a*EL + epsilon*ER - g*HR
+    return (-ER + M*x) / tau
+
+def dHLdt(HL, EL, params):
+    tau_h = params['tau_h']
+    return (-HL + EL) / tau_h
+
+def dHRdt(HR, ER, params):
+    tau_h = params['tau_h']
+    return (-HR + ER) / tau_h
+```
+
+
+Basic time course
+
+```{python}
+def dXdt(X, t):
+    # Parameters
+    tau = 10.0
+    tau_H = 100.0
+    M = 1.0
+    a = 3.4
+    epsilon = 0.0
+    g = 3.0
+
+    L_input = 1.0  # constant left stimulus
+    R_input = 1.0  # constant right stimulus
+   
+    EL, ER, HL, HR = X
+
+    dEL = (-EL + M * (L_input - a * ER + epsilon * EL - g * HL)) / tau
+    dER = (-ER + M * (R_input - a * EL + epsilon * ER - g * HR)) / tau
+    dHL = (-HL + EL) / tau_H
+    dHR = (-HR + ER) / tau_H
+
+    return [dEL, dER, dHL, dHR]
+
+# Initial conditions and time vector
+X0 = [0.1, 0.1, 0.0, 0.0]
+t = np.linspace(0, 500, 5001)
+
+# Integrate
+X = odeint(dXdt, X0, t)
+EL, ER, HL, HR = X.T
+
+# Plot
+plt.plot(t, EL, label='Left eye')
+plt.plot(t, ER, label='Right eye')
+plt.xlabel('Time')
+plt.ylabel('Activity')
+plt.legend()
+plt.show()
+```
+
