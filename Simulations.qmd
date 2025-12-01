@@ -16,7 +16,6 @@ a = 3.4
 L = R for paramater variations
 
 ```{python}
-# defining derivatives
 def dELdt(EL, ER, HL, L_input, params):
     M = params['M']
     a = params['a']
@@ -50,20 +49,21 @@ Basic time course
 ```{python}
 def dXdt(X, t):
     # Parameters
-    tau = 10.0
-    tau_H = 100.0
+    tau = 15.0
+    tau_H = 996.0
     M = 1.0
     a = 3.4
     epsilon = 0.0
     g = 3.0
 
     L_input = 1.0  # constant left stimulus
-    R_input = 1.0  # constant right stimulus
+    R_input = 0.86  # constant right stimulus
    
     EL, ER, HL, HR = X
 
-    dEL = (-EL + M * (L_input - a * ER + epsilon * EL - g * HL)) / tau
-    dER = (-ER + M * (R_input - a * EL + epsilon * ER - g * HR)) / tau
+    dEL = (-EL + M * np.maximum(L_input - a * ER + epsilon * EL - g * HL, 0)) / tau
+    dER = (-ER + M * np.maximum(R_input - a * EL + epsilon * ER - g * HR, 0)) / tau
+    
     dHL = (-HL + EL) / tau_H
     dHR = (-HR + ER) / tau_H
 
@@ -71,7 +71,7 @@ def dXdt(X, t):
 
 # Initial conditions and time vector
 X0 = [0.1, 0.1, 0.0, 0.0]
-t = np.linspace(0, 500, 5001)
+t = np.linspace(0, 20000, 5001)
 
 # Integrate
 X = odeint(dXdt, X0, t)
@@ -86,3 +86,8 @@ plt.legend()
 plt.show()
 ```
 
+Steady states
+
+```{python}
+
+```
