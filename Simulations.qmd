@@ -86,8 +86,127 @@ plt.legend()
 plt.show()
 ```
 
-Steady states
+```{python}
+# --- Define a factory function to generate the ODE function with fixed inputs ---
+def create_dXdt_func(L_input, R_input):
+    def dXdt_variable(X, t):
+        # Parameters
+        tau = 15.0
+        tau_H = 996.0
+        M = 1.0
+        a = 3.4
+        epsilon = 0.0
+        g = 3.0
+       
+        # L_input and R_input are now closed over by this function
+        EL, ER, HL, HR = X
+
+        dEL = (-EL + M * np.maximum(L_input - a * ER + epsilon * EL - g * HL, 0)) / tau
+        dER = (-ER + M * np.maximum(R_input - a * EL + epsilon * ER - g * HR, 0)) / tau
+        
+        dHL = (-HL + EL) / tau_H
+        dHR = (-HR + ER) / tau_H
+
+        return [dEL, dER, dHL, dHR]
+    return dXdt_variable
+```
+
+
 
 ```{python}
+from scipy.signal import find_peaks
 
+def calculate_durations(t, EL, ER, prominence=0.5, start_time_to_ignore=5000):
+    """
+    Finds the time between consecutive peaks of the same eye (L-L or R-R).
+    This measures the mean dominance duration for each eye.
+    """
+    
+    # Use data after a transient period (e.g., first 5000ms)
+    transient_mask = t >= start_time_to_ignore
+    t_filtered = t[transient_mask]
+    EL_filtered = EL[transient_mask]
+    ER_filtered = ER[transient_mask]
+
+    # Find peaks. Prominence ensures only significant activity peaks are counted.
+    l_peak_indices, _ = find_peaks(EL_filtered, prominence=prominence)
+    r_peak_indices, _ = find_peaks(ER_filtered, prominence=prominence)
+    
+    t_L_peaks = t_filtered[l_peak_indices]
+    t_R_peaks = t_filtered[r_peak_indices]
+
+    # Calculate L-durations (L-peak to L-peak)
+    L_durations = np.diff(t_L_peaks)
+    # Calculate R-durations (R-peak to R-peak)
+    R_durations = np.diff(t_R_peaks)
+    
+    if L_durations.size < 1 or R_durations.size < 1:
+        return np.nan, np.nan # Not enough oscillations found
+
+    return np.mean(L_durations), np.mean(R_durations)
+```
+
+```{python}
+# --- Define the range of R_input values and simulation settings ---
+L_input_fixed = 1.0          # Constant left stimulus
+X0 = [0.1, 0.1, 0.0, 0.0]    # Initial conditions
+t = np.linspace(0, 20000, 5001) # Time vector (20 seconds)
+
+# Range of R_input to test for Fig 3
+R_input_values = np.linspace(0.5, 1.5, 31) 
+
+# Data storage
+L_durations_list = []
+R_durations_list = []
+
+# --- Main Loop ---
+for R_input in R_input_values:
+    # 1. Get the ODE function specific to this R_input
+    dXdt_func = create_dXdt_func(L_input_fixed, R_input)
+    
+    # 2. Integrate
+    X = odeint(dXdt_func, X0, t)
+    EL, ER = X.T[0], X.T[1]
+    
+    # 3. Calculate mean durations
+    mean_L_duration, mean_R_duration = calculate_durations(t, EL, ER)
+    
+    L_durations_list.append(mean_L_duration)
+    R_durations_list.append(mean_R_duration)
+
+# --- Process results into Strong and Weak Durations ---
+strong_durations_plot = []
+weak_durations_plot = []
+
+for i, R_input in enumerate(R_input_values):
+    L_dur = L_durations_list[i]
+    R_dur = R_durations_list[i]
+    
+    # Skip if rivalry was not established for this R_input
+    if np.isnan(L_dur) or np.isnan(R_dur):
+        strong_durations_plot.append(np.nan)
+        weak_durations_plot.append(np.nan)
+        continue
+
+    # Strong duration corresponds to the eye receiving the higher input (max(L, R))
+    if R_input <= L_input_fixed: 
+        # L is stronger/equal: L_dur is Strong, R_dur is Weak
+        strong_durations_plot.append(L_dur)
+        weak_durations_plot.append(R_dur)
+    else: 
+        # R is stronger: R_dur is Strong, L_dur is Weak
+        strong_durations_plot.append(R_dur)
+        weak_durations_plot.append(L_dur)
+
+# --- Plotting Fig 3 ---
+plt.figure(figsize=(8, 5))
+plt.plot(R_input_values, strong_durations_plot, 'o-', label='Strong Duration')
+plt.plot(R_input_values, weak_durations_plot, 's-', label='Weak Duration')
+plt.axvline(L_input_fixed, color='gray', linestyle='--', label=r'L$_{input}$ = 1.0 (Fixed)')
+plt.xlabel(r'Variable Input, R$_{input}$')
+plt.ylabel('Mean Dominance Duration (ms)')
+plt.title(r'Fig 3: Mean Dominance Durations vs. Input Strength')
+plt.legend()
+plt.grid(True)
+plt.show()
 ```
