@@ -6,6 +6,7 @@ from scipy.integrate import solve_ivp
 from scipy.optimize import fsolve
 from scipy.integrate import odeint
 import random
+from scipy.signal import find_peaks
 ```
 
 Base Parameter values:
@@ -43,12 +44,8 @@ def dHRdt(HR, ER, params):
     return (-HR + ER) / tau_h
 ```
 
-
-Basic time course
-
 ```{python}
-def dXdt(X, t):
-    # Parameters
+def dXdt(X, t, L_input=1.0, R_input=0.86):
     tau = 15.0
     tau_H = 996.0
     M = 1.0
@@ -56,157 +53,92 @@ def dXdt(X, t):
     epsilon = 0.0
     g = 3.0
 
-    L_input = 1.0  # constant left stimulus
-    R_input = 0.86  # constant right stimulus
-   
     EL, ER, HL, HR = X
 
     dEL = (-EL + M * np.maximum(L_input - a * ER + epsilon * EL - g * HL, 0)) / tau
     dER = (-ER + M * np.maximum(R_input - a * EL + epsilon * ER - g * HR, 0)) / tau
-    
     dHL = (-HL + EL) / tau_H
     dHR = (-HR + ER) / tau_H
 
     return [dEL, dER, dHL, dHR]
+```
 
+
+Figure 2
+```{python}
 # Initial conditions and time vector
 X0 = [0.1, 0.1, 0.0, 0.0]
 t = np.linspace(0, 20000, 5001)
 
-# Integrate
 X = odeint(dXdt, X0, t)
 EL, ER, HL, HR = X.T
 
-# Plot
-plt.plot(t, EL, label='Left eye')
-plt.plot(t, ER, label='Right eye')
-plt.xlabel('Time')
+plt.figure(figsize=(10, 4))
+plt.plot(t/1000, EL, 'k-', label='Left eye (Strong)') # Divided by 1000 for seconds
+plt.plot(t/1000, ER, 'k--', label='Right eye (Weak)')
+plt.title(f"Simulation with L={1.0}, R={0.86}")
+plt.xlabel('Time (s)')
 plt.ylabel('Activity')
 plt.legend()
 plt.show()
 ```
 
+Figure 3
 ```{python}
-# --- Define a factory function to generate the ODE function with fixed inputs ---
-def create_dXdt_func(L_input, R_input):
-    def dXdt_variable(X, t):
-        # Parameters
-        tau = 15.0
-        tau_H = 996.0
-        M = 1.0
-        a = 3.4
-        epsilon = 0.0
-        g = 3.0
-       
-        # L_input and R_input are now closed over by this function
-        EL, ER, HL, HR = X
+R_strengths = np.linspace(0.86, 1.0, 15) 
+L_strength = 1.0
 
-        dEL = (-EL + M * np.maximum(L_input - a * ER + epsilon * EL - g * HL, 0)) / tau
-        dER = (-ER + M * np.maximum(R_input - a * EL + epsilon * ER - g * HR, 0)) / tau
+avg_durations_strong = [] # Left eye -Strong
+avg_durations_weak = []   # Right eye - weak
+
+t = np.linspace(0, 60000, 10000) # 60 seconds
+X0 = [0.1, 0.1, 0.0, 0.0] # Initial conditions
+
+for R_val in R_strengths:
+    X = odeint(dXdt, X0, t, args=(L_strength, R_val))
+    EL = X[:, 0]
+    ER = X[:, 1]
+    peaks_L, _ = find_peaks(EL, height=0.1)
+    peaks_R, _ = find_peaks(ER, height=0.1)
+
+    events = [(i, 'L') for i in peaks_L] + [(i, 'R') for i in peaks_R]
+    events.sort(key=lambda x: x[0]) # Sort by time
+    
+    durations_L = []
+    durations_R = []
+    
+    #find alternating L- R - L patterns
+    for k in range(len(events) - 1):
+        idx_curr, eye_curr = events[k]
+        idx_next, eye_next = events[k+1]
+        dt_seconds = (t[idx_next] - t[idx_curr]) / 1000.0
         
-        dHL = (-HL + EL) / tau_H
-        dHR = (-HR + ER) / tau_H
+        if eye_curr == 'L' and eye_next == 'R':
+            # Time from L peak to R peak
+            durations_L.append(dt_seconds)
+        elif eye_curr == 'R' and eye_next == 'L':
+            # Time from R peak to L peak
+            durations_R.append(dt_seconds)
+            
+    if durations_L:
+        avg_durations_strong.append(np.mean(durations_L))
+    else:
+        avg_durations_strong.append(np.nan)
+        
+    if durations_R:
+        avg_durations_weak.append(np.mean(durations_R))
+    else:
+        avg_durations_weak.append(np.nan)
 
-        return [dEL, dER, dHL, dHR]
-    return dXdt_variable
-```
 
-
-
-```{python}
-from scipy.signal import find_peaks
-
-def calculate_durations(t, EL, ER, prominence=0.5, start_time_to_ignore=5000):
-    """
-    Finds the time between consecutive peaks of the same eye (L-L or R-R).
-    This measures the mean dominance duration for each eye.
-    """
-    
-    # Use data after a transient period (e.g., first 5000ms)
-    transient_mask = t >= start_time_to_ignore
-    t_filtered = t[transient_mask]
-    EL_filtered = EL[transient_mask]
-    ER_filtered = ER[transient_mask]
-
-    # Find peaks. Prominence ensures only significant activity peaks are counted.
-    l_peak_indices, _ = find_peaks(EL_filtered, prominence=prominence)
-    r_peak_indices, _ = find_peaks(ER_filtered, prominence=prominence)
-    
-    t_L_peaks = t_filtered[l_peak_indices]
-    t_R_peaks = t_filtered[r_peak_indices]
-
-    # Calculate L-durations (L-peak to L-peak)
-    L_durations = np.diff(t_L_peaks)
-    # Calculate R-durations (R-peak to R-peak)
-    R_durations = np.diff(t_R_peaks)
-    
-    if L_durations.size < 1 or R_durations.size < 1:
-        return np.nan, np.nan # Not enough oscillations found
-
-    return np.mean(L_durations), np.mean(R_durations)
-```
-
-```{python}
-# --- Define the range of R_input values and simulation settings ---
-L_input_fixed = 1.0          # Constant left stimulus
-X0 = [0.1, 0.1, 0.0, 0.0]    # Initial conditions
-t = np.linspace(0, 20000, 5001) # Time vector (20 seconds)
-
-# Range of R_input to test for Fig 3
-R_input_values = np.linspace(0.5, 1.5, 31) 
-
-# Data storage
-L_durations_list = []
-R_durations_list = []
-
-# --- Main Loop ---
-for R_input in R_input_values:
-    # 1. Get the ODE function specific to this R_input
-    dXdt_func = create_dXdt_func(L_input_fixed, R_input)
-    
-    # 2. Integrate
-    X = odeint(dXdt_func, X0, t)
-    EL, ER = X.T[0], X.T[1]
-    
-    # 3. Calculate mean durations
-    mean_L_duration, mean_R_duration = calculate_durations(t, EL, ER)
-    
-    L_durations_list.append(mean_L_duration)
-    R_durations_list.append(mean_R_duration)
-
-# --- Process results into Strong and Weak Durations ---
-strong_durations_plot = []
-weak_durations_plot = []
-
-for i, R_input in enumerate(R_input_values):
-    L_dur = L_durations_list[i]
-    R_dur = R_durations_list[i]
-    
-    # Skip if rivalry was not established for this R_input
-    if np.isnan(L_dur) or np.isnan(R_dur):
-        strong_durations_plot.append(np.nan)
-        weak_durations_plot.append(np.nan)
-        continue
-
-    # Strong duration corresponds to the eye receiving the higher input (max(L, R))
-    if R_input <= L_input_fixed: 
-        # L is stronger/equal: L_dur is Strong, R_dur is Weak
-        strong_durations_plot.append(L_dur)
-        weak_durations_plot.append(R_dur)
-    else: 
-        # R is stronger: R_dur is Strong, L_dur is Weak
-        strong_durations_plot.append(R_dur)
-        weak_durations_plot.append(L_dur)
-
-# --- Plotting Fig 3 ---
-plt.figure(figsize=(8, 5))
-plt.plot(R_input_values, strong_durations_plot, 'o-', label='Strong Duration')
-plt.plot(R_input_values, weak_durations_plot, 's-', label='Weak Duration')
-plt.axvline(L_input_fixed, color='gray', linestyle='--', label=r'L$_{input}$ = 1.0 (Fixed)')
-plt.xlabel(r'Variable Input, R$_{input}$')
-plt.ylabel('Mean Dominance Duration (ms)')
-plt.title(r'Fig 3: Mean Dominance Durations vs. Input Strength')
+plt.figure(figsize=(8, 6))
+plt.plot(R_strengths, avg_durations_strong, 'o-', color='black', label='Strong (L=1.0)', linewidth=2)
+plt.plot(R_strengths, avg_durations_weak, 'o--', color='black', label='Weak (R varies)', mfc='white', linewidth=2)
+plt.title("Levelt's Second Law")
+plt.xlabel('Strength of Weaker Stimulus')
+plt.ylabel('Dominance Duration (seconds)')
 plt.legend()
-plt.grid(True)
+plt.grid(True, linestyle=':', alpha=0.6)
+plt.xlim(0.85, 1.01)
 plt.show()
 ```
