@@ -91,11 +91,13 @@ L_strength = 1.0
 avg_durations_strong = [] # Left eye -Strong
 avg_durations_weak = []   # Right eye - weak
 
-t = np.linspace(0, 60000, 10000) # 60 seconds
-X0 = [0.1, 0.1, 0.0, 0.0] # Initial conditions
+t = np.linspace(0, 100000, 100000) # 100 seconds
+X0 = [0.11, 0.1, 0.0, 0.0] # asymmetric initial conditions
 
 for R_val in R_strengths:
     X = odeint(dXdt, X0, t, args=(L_strength, R_val))
+    X0_new = X[-1,:] # last value
+    X = odeint(dXdt, X0_new, t, args=(L_strength, R_val))
     EL = X[:, 0]
     ER = X[:, 1]
     peaks_L, _ = find_peaks(EL, height=0.1)
@@ -142,3 +144,6 @@ plt.grid(True, linestyle=':', alpha=0.6)
 plt.xlim(0.85, 1.01)
 plt.show()
 ```
+
+Fig 5
+time course for symmetric input and asymmetric initial conditions
