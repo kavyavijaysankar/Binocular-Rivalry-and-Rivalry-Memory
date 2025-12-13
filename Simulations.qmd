@@ -73,9 +73,11 @@ t = np.linspace(0, 20000, 5001)
 X = odeint(dXdt, X0, t)
 EL, ER, HL, HR = X.T
 
-plt.figure(figsize=(10, 4))
-plt.plot(t/1000, EL, 'k-', label='Left eye (Strong)') # Divided by 1000 for seconds
-plt.plot(t/1000, ER, 'k--', label='Right eye (Weak)')
+fig = plt.figure(figsize=(8, 5))
+fig.patch.set_facecolor('#f1f1f1')
+plt.gca().set_facecolor('#f1f1f1')
+plt.plot(t/1000, EL, 'r-', label='Left eye (Strong)') # Divided by 1000 for seconds
+plt.plot(t/1000, ER, 'b--', label='Right eye (Weak)')
 plt.title(f"Simulation with L={1.0}, R={0.86}")
 plt.xlabel('Time (s)')
 plt.ylabel('Activity')
@@ -133,10 +135,12 @@ for R_val in R_strengths:
         avg_durations_weak.append(np.nan)
 
 
-plt.figure(figsize=(8, 6))
-plt.plot(R_strengths, avg_durations_strong, 'o-', color='black', label='Strong (L=1.0)', linewidth=2)
-plt.plot(R_strengths, avg_durations_weak, 'o--', color='black', label='Weak (R varies)', mfc='white', linewidth=2)
-plt.title("Levelt's Second Law")
+fig = plt.figure(figsize=(8, 6))
+fig.patch.set_facecolor('#f1f1f1')
+plt.gca().set_facecolor('#f1f1f1')
+plt.plot(R_strengths, avg_durations_strong, 'o-', color='blue', label='Strong', linewidth=2)
+plt.plot(R_strengths, avg_durations_weak, 'o--', color='red', label='Weak', mfc='white', linewidth=2)
+plt.title("Dominance Durations")
 plt.xlabel('Strength of Weaker Stimulus')
 plt.ylabel('Dominance Duration (seconds)')
 plt.legend()
