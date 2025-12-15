@@ -152,77 +152,87 @@ plt.show()
 Fig 5
 time course for symmetric input and asymmetric initial conditions
 ```{python}
-# --- Recreating Figure 5: Theoretical Dependence on Parameters ---
-
 def theoretical_duration(params, L=1.0, R=1.0):
     """
     Implements Eq (8) from Wilson (2007).
-    T = tau_H * ln( g / (1/M + g - epsilon - a*(L/R)) )
     """
-    tau_H = 0.996  # Seconds (from Table 1 and text)
+    tau_H = 1.95 
     M = params['M']
     g = params['g']
     eps = params['epsilon']
     a = params['a']
     
-    # Denominator of the log argument in Eq (8)
+
+    # Eq 8, solving for denominator tending to 0
     denom = (1/M) + g - eps - (a * (L/R))
     
-    # Avoid division by zero or log of negative numbers (WTA regime)
     with np.errstate(divide='ignore', invalid='ignore'):
         arg = g / denom
         T = tau_H * np.log(arg)
-        # Filter out invalid results (Winner-Take-All or unstable regimes)
-        T = np.where((denom <= 0) | (arg <= 0), np.nan, T)
+        # Filter out impossible regions (WTA or no oscillation)
+        T = np.where((denom <= 0) | (arg <= 1.0), np.nan, T)
         
     return T
 
-# Base parameters (from text Section 4)
-base_params = {'M': 1.0, 'g': 3.0, 'epsilon': 0.0, 'a': 3.4}
+# base parameters
+base = {'M': 1.0, 'g': 3.0, 'epsilon': 0.0, 'a': 3.4}
 
-# 1. Vary Epsilon (Recurrent excitation)
-eps_vals = np.linspace(0, 0.6, 100)
-T_eps = [theoretical_duration({**base_params, 'epsilon': val}) for val in eps_vals]
 
-# 2. Vary M (Response gain)
-M_vals = np.linspace(1.0, 2.5, 100)
-T_M = [theoretical_duration({**base_params, 'M': val}) for val in M_vals]
+# epsilon
+eps_limit = (1/base['M']) + base['g'] - base['a']
+eps_vals = np.linspace(0, eps_limit - 0.01, 200)
+T_eps = theoretical_duration({'M': 1.0, 'g': 3.0, 'epsilon': eps_vals, 'a': 3.4})
 
-# 3. Vary g (Adaptation strength)
-g_vals = np.linspace(2.5, 6.0, 100)
-T_g = [theoretical_duration({**base_params, 'g': val}) for val in g_vals]
+# M
+M_limit = 1.0 / (base['a'] - base['g'] + base['epsilon'])
+M_vals = np.linspace(0.3, M_limit - 0.01, 200)
+T_M = theoretical_duration({'M': M_vals, 'g': 3.0, 'epsilon': 0.0, 'a': 3.4})
 
-# 4. Vary a (Inhibition strength)
-a_vals = np.linspace(0.5, 4.0, 100)
-T_a = [theoretical_duration({**base_params, 'a': val}) for val in a_vals]
+# g
+g_limit = base['a'] + base['epsilon'] - (1/base['M'])
+g_vals = np.linspace(g_limit + 0.01, 6.0, 200)
+T_g = theoretical_duration({'M': 1.0, 'g': g_vals, 'epsilon': 0.0, 'a': 3.4})
 
-# --- Plotting ---
-plt.figure(figsize=(8, 8))
+#a
+a_limit = (1/base['M']) + base['g'] - base['epsilon']
+a_vals = np.linspace(1.05, a_limit - 0.01, 200)
+T_a = theoretical_duration({'M': 1.0, 'g': 3.0, 'epsilon': 0.0, 'a': a_vals})
 
-# Plot Epsilon
-plt.plot(eps_vals, T_eps, 'o--', color='white', markeredgecolor='black', label=r'$\epsilon$ (Recurrent Excitation)')
 
-# Plot M
-plt.plot(M_vals, T_M, 's--', color='white', markeredgecolor='black', label='M (Response Gain)')
+def ten_s_plot(T): 
+    return np.where(T > 10, np.nan, T) # cuts after 10 seconds
 
-# Plot g (Solid line in paper)
-plt.plot(g_vals, T_g, 'o-', color='black', label='g (Adaptation)')
+fig = plt.figure(figsize=(7, 4))
+fig.patch.set_facecolor('#f1f1f1')
+plt.gca().set_facecolor('#f1f1f1')
 
-# Plot a
-plt.plot(a_vals, T_a, 'o--', color='white', markeredgecolor='gray', label='a (Inhibition)')
+c_eps = 'tab:blue'
+c_M = 'tab:red'
+c_g = 'tab:green'
+c_a = 'tab:purple'
 
-plt.title('Figure 5: Dependence on Physiological Parameters')
+plt.plot(eps_vals, ten_s_plot(T_eps), '--', color=c_eps, label=r'$\epsilon$')
+plt.scatter(eps_vals[::20], ten_s_plot(T_eps)[::20], color='white', edgecolors=c_eps, zorder=3)
+plt.text(eps_limit, 9.5, "WTA", color=c_eps, fontweight='bold', ha='center')
+
+plt.plot(M_vals, ten_s_plot(T_M), '--', color=c_M, label='M')
+plt.scatter(M_vals[::20], ten_s_plot(T_M)[::20], marker='s', color='white', edgecolors=c_M, zorder=3)
+plt.text(M_limit, 9.5, "WTA", color=c_M, fontweight='bold', ha='center')
+
+plt.plot(g_vals, ten_s_plot(T_g), '--', color=c_g, linewidth=2, label='g')
+plt.scatter(g_vals[::20], ten_s_plot(T_g)[::20], color=c_g, edgecolors=c_g, zorder=3)
+plt.text(g_limit, 9.0, "WTA", color=c_g, fontweight='bold', ha='center')
+
+plt.plot(a_vals, ten_s_plot(T_a), '--', color=c_a, label='a')
+plt.scatter(a_vals[::20], ten_s_plot(T_a)[::20], color='white', edgecolors=c_a, zorder=3)
+plt.text(a_limit, 9.5, "WTA", color=c_a, fontweight='bold', ha='center')
+
 plt.xlabel('Parameter Value')
 plt.ylabel('Dominance Duration (seconds)')
-plt.ylim(0, 10)  # Cut off the asymptotes (WTA bifurcation)
+plt.ylim(0, 10)
 plt.xlim(0, 6)
 plt.legend()
-plt.grid(True, linestyle=':', alpha=0.6)
-
-# Annotate "WTA" regions (Where duration approaches infinity)
-plt.text(0.5, 8, 'WTA', fontsize=10, fontweight='bold') # Near epsilon curve
-plt.text(2.2, 8, 'WTA', fontsize=10, fontweight='bold') # Near M curve
-plt.text(3.8, 8, 'WTA', fontsize=10, fontweight='bold') # Near a curve
-
+plt.grid(True, linestyle=':', alpha=0.4)
+plt.tight_layout()
 plt.show()
 ```
