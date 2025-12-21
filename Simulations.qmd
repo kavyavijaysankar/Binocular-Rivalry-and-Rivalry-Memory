@@ -153,9 +153,6 @@ Fig 5
 time course for symmetric input and asymmetric initial conditions
 ```{python}
 def theoretical_duration(params, L=1.0, R=1.0):
-    """
-    Implements Eq (8) from Wilson (2007).
-    """
     tau_H = 1.95 
     M = params['M']
     g = params['g']
@@ -178,7 +175,7 @@ def theoretical_duration(params, L=1.0, R=1.0):
 base = {'M': 1.0, 'g': 3.0, 'epsilon': 0.0, 'a': 3.4}
 
 
-# epsilon
+#e
 eps_limit = (1/base['M']) + base['g'] - base['a']
 eps_vals = np.linspace(0, eps_limit - 0.01, 200)
 T_eps = theoretical_duration({'M': 1.0, 'g': 3.0, 'epsilon': eps_vals, 'a': 3.4})
@@ -217,11 +214,11 @@ plt.text(eps_limit, 9.5, "WTA", color=c_eps, fontweight='bold', ha='center')
 
 plt.plot(M_vals, ten_s_plot(T_M), '--', color=c_M, label='M')
 plt.scatter(M_vals[::20], ten_s_plot(T_M)[::20], marker='s', color='white', edgecolors=c_M, zorder=3)
-plt.text(M_limit, 9.5, "WTA", color=c_M, fontweight='bold', ha='center')
+plt.text(M_limit, 9.5, "WTA", color=c_M, fontweight='bold', ha='right')
 
 plt.plot(g_vals, ten_s_plot(T_g), '--', color=c_g, linewidth=2, label='g')
 plt.scatter(g_vals[::20], ten_s_plot(T_g)[::20], color=c_g, edgecolors=c_g, zorder=3)
-plt.text(g_limit, 9.0, "WTA", color=c_g, fontweight='bold', ha='center')
+plt.text(g_limit, 9.0, "WTA", color=c_g, fontweight='bold', ha='left')
 
 plt.plot(a_vals, ten_s_plot(T_a), '--', color=c_a, label='a')
 plt.scatter(a_vals[::20], ten_s_plot(T_a)[::20], color='white', edgecolors=c_a, zorder=3)
