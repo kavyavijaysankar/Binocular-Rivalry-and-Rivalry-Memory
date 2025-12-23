@@ -135,15 +135,14 @@ for R_val in R_strengths:
         avg_durations_weak.append(np.nan)
 
 
-fig = plt.figure(figsize=(8, 6))
+fig = plt.figure(figsize=(8.5, 6))
 fig.patch.set_facecolor('#f1f1f1')
 plt.gca().set_facecolor('#f1f1f1')
 plt.plot(R_strengths, avg_durations_strong, 'o-', color='blue', label='Strong', linewidth=2)
 plt.plot(R_strengths, avg_durations_weak, 'o--', color='red', label='Weak', mfc='white', linewidth=2)
-plt.title("Dominance Durations")
-plt.xlabel('Strength of Weaker Stimulus')
-plt.ylabel('Dominance Duration (seconds)')
-plt.legend()
+plt.xlabel('Strength of Weaker Stimulus', fontsize=18)
+plt.ylabel('Dominance Duration (seconds)', fontsize=18)
+plt.legend(prop={'size': 18,})
 plt.grid(True, linestyle=':', alpha=0.6)
 plt.xlim(0.85, 1.01)
 plt.show()
@@ -224,12 +223,78 @@ plt.plot(a_vals, ten_s_plot(T_a), '--', color=c_a, label='a')
 plt.scatter(a_vals[::20], ten_s_plot(T_a)[::20], color='white', edgecolors=c_a, zorder=3)
 plt.text(a_limit, 9.5, "WTA", color=c_a, fontweight='bold', ha='center')
 
-plt.xlabel('Parameter Value')
-plt.ylabel('Dominance Duration (seconds)')
+plt.xlabel('Parameter Value', fontsize=16)
+plt.ylabel('Dominance Duration (seconds)', fontsize=15)
 plt.ylim(0, 10)
 plt.xlim(0, 6)
-plt.legend()
+plt.legend(prop={'size': 15})
 plt.grid(True, linestyle=':', alpha=0.4)
 plt.tight_layout()
+plt.show()
+```
+
+
+Phase plane when H is treated as a constant - tau_h >> tau
+Provides short-term behaviour.
+
+```{python}
+M = 1.0
+a = 3.4
+epsilon = 0.0
+g = 3.0
+tau = 15.0
+L = 1.0
+R = 1.0
+
+J_11 = (-1 + M * epsilon) / tau
+J_12 = (-M * a) / tau
+J_21 = (-M * a) / tau
+J_22 = (-1 + M * epsilon) / tau
+
+jacobian = np.array([[J_11, J_12],
+                     [J_21, J_22]])
+
+# Calculate Eigenvalues
+eigenvalues = np.linalg.eigvals(jacobian)
+max_eigenvalue = np.max(np.real(eigenvalues))
+
+HL_fixed = 0.0
+HR_fixed = 0.0
+
+# Define range for EL and ER
+E_range = np.linspace(0, 1.0, 100)
+E_grid_L, E_grid_R = np.meshgrid(E_range, E_range)
+
+# Calculate Nullclines (where dE/dt = 0)
+
+nc_L_y = (M*(L - g*HL_fixed) - E_range*(1 - M*epsilon)) / (M*a)
+
+# Nullcline for ER: ER = M * [R - a*EL + eps*ER - g*HR]+
+
+dEL = (-E_grid_L + M * np.maximum(L - a * E_grid_R + epsilon * E_grid_L - g * HL_fixed, 0)) / tau
+dER = (-E_grid_R + M * np.maximum(R - a * E_grid_L + epsilon * E_grid_R - g * HR_fixed, 0)) / tau
+
+# Plot
+fig = plt.figure(figsize=(8, 8))
+fig.patch.set_facecolor('#f1f1f1')
+plt.gca().set_facecolor('#f1f1f1')
+# plt.title(f"Fast System Phase Plane)", fontsize=20)
+plt.xlabel("$E_L$ (Left Eye Activity)", fontsize=18)
+plt.ylabel("$E_R$ (Right Eye Activity)", fontsize=18)
+
+# Streamplot to show flow
+plt.streamplot(E_range, E_range, dEL, dER, color='gray', linewidth=2, density=1.5)
+
+# Plot Nullclines (approximate via contour)
+plt.contour(E_grid_L, E_grid_R, dEL, levels=[0], colors='blue', linewidths=2, label='EL Nullcline')
+plt.contour(E_grid_L, E_grid_R, dER, levels=[0], colors='red', linewidths=2, label='ER Nullcline')
+
+# Add legend (proxy artists)
+import matplotlib.lines as mlines
+blue_line = mlines.Line2D([], [], color='blue', label='$dE_L/dt = 0$')
+red_line = mlines.Line2D([], [], color='red', label='$dE_R/dt = 0$')
+plt.legend(handles=[blue_line, red_line], loc='upper right', prop={'size': 18, 'weight': 'bold'})
+
+plt.grid(True)
 plt.show()
 ```
